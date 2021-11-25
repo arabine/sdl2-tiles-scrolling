@@ -1,9 +1,53 @@
 #include <iostream>
 
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
 #include <chrono>
 #include "glad/glad.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+
+SDL_Texture *LoadImage(SDL_Renderer *renderer, const char* filename)
+{
+    // Read data
+    int32_t width, height, bytesPerPixel;
+    void* data = stbi_load(filename, &width, &height, &bytesPerPixel, 0);
+
+    // Calculate pitch
+    int pitch;
+    pitch = width * bytesPerPixel;
+    pitch = (pitch + 3) & ~3;
+
+    // Setup relevance bitmask
+    int32_t Rmask, Gmask, Bmask, Amask;
+#if SDL_BYTEORDER == SDL_LIL_ENDIAN
+    Rmask = 0x000000FF;
+    Gmask = 0x0000FF00;
+    Bmask = 0x00FF0000;
+    Amask = (bytesPerPixel == 4) ? 0xFF000000 : 0;
+#else
+    int s = (bytesPerPixel == 4) ? 0 : 8;
+    Rmask = 0xFF000000 >> s;
+    Gmask = 0x00FF0000 >> s;
+    Bmask = 0x0000FF00 >> s;
+    Amask = 0x000000FF >> s;
+#endif
+    SDL_Surface* surface = SDL_CreateRGBSurfaceFrom(data, width, height, bytesPerPixel*8, pitch, Rmask, Gmask, Bmask, Amask);
+    SDL_Texture* t = nullptr;
+    if (surface)
+    {
+        t = SDL_CreateTextureFromSurface(renderer, surface);
+    }
+    else
+    {
+        t = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 20, 20);
+    }
+
+    STBI_FREE(data);
+    SDL_FreeSurface(surface);
+    return t;
+}
 
 static SDL_Window *gWindow;
 static SDL_GLContext gl_context;
@@ -96,10 +140,8 @@ int sdl_init(void)
 }
 
 
-
 void draw_background(SDL_Renderer *renderer, double deltaTime)
 {
-
     SDL_RenderCopyEx(renderer, tile_texture, NULL, &tile_rect, 0.0, NULL, SDL_FLIP_NONE);
 }
 
@@ -152,7 +194,7 @@ int main()
 
 
 #ifdef IMPL1
-    tile_texture = IMG_LoadTexture(renderer, "background.png");
+    tile_texture = LoadImage(renderer, "background.png");
     SDL_QueryTexture(tile_texture, NULL, NULL, &tile_rect.w, &tile_rect.h);
     tile_rect.x = 0;
     tile_rect.y = 0;
@@ -243,8 +285,6 @@ int main()
 
         auto start = std::chrono::system_clock::now();
 
-
-/*
 #ifdef IMPL1
         draw_background(renderer, deltaTime);
 #endif
@@ -256,7 +296,7 @@ int main()
 #ifdef IMPL3
         draw_background3(renderer, deltaTime);
 #endif
-*/
+
         iter++;
 
         auto end = std::chrono::system_clock::now();
